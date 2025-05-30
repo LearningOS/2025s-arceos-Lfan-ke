@@ -59,7 +59,6 @@ pub use alloc::{boxed, format, string, vec};
 
 #[cfg(feature = "alloc")]
 pub mod collections {
-    pub use alloc::collections;
     pub use alloc::collections::*;
     pub type HashMap<K, V> = BTreeMap<K, V>;
 }
