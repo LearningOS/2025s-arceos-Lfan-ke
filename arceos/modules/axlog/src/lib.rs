@@ -230,7 +230,43 @@ pub fn print_fmt(args: fmt::Arguments) -> fmt::Result {
     static LOCK: SpinNoIrq<()> = SpinNoIrq::new(());
 
     let _guard = LOCK.lock();
-    Logger.write_fmt(args)
+    
+    // heke - color2
+    struct RainbowWriter;
+    impl fmt::Write for RainbowWriter {
+        fn write_str(&mut self, s: &str) -> fmt::Result {
+            for (i, c) in s.chars().enumerate() {
+                let hue = (i as f32 * 5.0) % 360.0;
+                let (r, g, b) = hsv_to_rgb(hue, 1.0, 1.0);
+                Logger.write_fmt(format_args!("\x1b[38;2;{};{};{}m{}", r, g, b, c))?;
+            }
+            Logger.write_str("\x1b[0m")?;
+            Ok(())
+        }
+    }
+
+    let mut writer = RainbowWriter;
+    writer.write_fmt(args)
+}
+
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+    let c = v * s;
+    let h_div = h / 60.0;
+    let x = c * (1.0 - (if h_div % 2.0 > 1.0 { h_div % 2.0 - 1.0 } else { 1.0 - h_div % 2.0 }));
+    let m = v - c;
+    let (r, g, b) = match (h_div as u8) {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    (
+        ((r + m) * 255.0) as u8,
+        ((g + m) * 255.0) as u8,
+        ((b + m) * 255.0) as u8,
+    )
 }
 
 #[doc(hidden)]
