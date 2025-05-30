@@ -63,6 +63,7 @@ pub mod console {
     pub use super::platform::console::*;
 
     /// Write a slice of bytes to the console.
+    /// heke: color3 若不是会干扰高层的ANSI转义，在知道就应该在这里改的
     pub fn write_bytes(bytes: &[u8]) {
         for c in bytes {
             putchar(*c);

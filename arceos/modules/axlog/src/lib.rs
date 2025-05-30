@@ -254,7 +254,7 @@ fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
     let h_div = h / 60.0;
     let x = c * (1.0 - (if h_div % 2.0 > 1.0 { h_div % 2.0 - 1.0 } else { 1.0 - h_div % 2.0 }));
     let m = v - c;
-    let (r, g, b) = match (h_div as u8) {
+    let (r, g, b) = match h_div as u8 {
         0 => (c, x, 0.0),
         1 => (x, c, 0.0),
         2 => (0.0, c, x),
