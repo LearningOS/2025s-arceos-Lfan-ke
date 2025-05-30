@@ -92,6 +92,7 @@ axdma = { path = "modules/axdma" }
 elf = { path = "modules/elf" }
 
 [patch.crates-io]
-kernel_guard = { path = "../crates/kernel_guard"} 
+kernel_guard = { path = "../crates/kernel_guard"}
+
 [profile.release]
 lto = true
