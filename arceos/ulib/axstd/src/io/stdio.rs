@@ -171,7 +171,7 @@ pub fn __print_impl(args: core::fmt::Arguments) {
     } else {
         // heke - color1
         stdout().lock().write_fmt(format_args!(
-            "\x1b[47m\x1b[1m\x1b[38;2;150;50;255m{}\x1b[0m\r\x1b[K", 
+            "\x1b[1m\x1b[38;2;150;50;255m{}\x1b[0m\r\x1b[K",
             args
         )).unwrap();
     }
