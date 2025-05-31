@@ -2,6 +2,8 @@
 resolver = "2"
 
 members = [
+    "examples/shell",
+
     "modules/axalloc",
     "modules/alt_axalloc",
     "modules/axconfig",
