@@ -20,6 +20,11 @@ pub struct GlobalAllocator {
 impl GlobalAllocator {
     /// Creates an empty [`GlobalAllocator`].
     pub const fn new() -> Self {
+        /**
+         * 暂时没搞清楚为啥不用：
+         * let inner: EarlyAllocator<4096> = EarlyAllocator::new();
+         * Self { ...: ...(inner) }
+        **/
         Self {
             inner: SpinNoIrq::new(EarlyAllocator::new()),
         }
