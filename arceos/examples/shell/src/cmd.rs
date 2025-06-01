@@ -27,7 +27,70 @@ const CMD_TABLE: &[(&str, CmdHandler)] = &[
     ("pwd", do_pwd),
     ("rm", do_rm),
     ("uname", do_uname),
+    ("mv", do_mv),
+    ("rename", do_rename),
 ];
+
+#[inline]
+/// args 只有命令之后的参数 ！
+fn do_mv(args: &str) {
+    if args.is_empty() {
+        print_err!("mv", format!("args error: [{}]", args));
+        return;
+    }
+
+    let (src, dst) = split_whitespace(args);
+    if dst.is_empty() {
+        print_err!("mv", format!("args error: [{}]", args));
+        return;
+    }
+
+    if fs::metadata(src).is_err() {
+        print_err!("mv", format!("args error: [{}] - no such file/dir", args));
+        return;
+    }
+    
+    use crate::std::string::ToString;
+    
+    let final_dst = match fs::metadata(dst) {
+        Ok(metadata) if metadata.is_dir() => {
+            let src_filename = if let Some(last_slash) = src.rfind('/') {
+                &src[last_slash + 1..]
+            } else {
+                src
+            };
+            format!("{}/{}", dst.trim_end_matches('/'), src_filename)
+        }
+        _ => dst.to_string(),
+    };
+
+    if let Err(e) = fs::rename(src, &final_dst) {
+        print_err!("mv", format_args!("failed to move '{}' to '{}'", src, dst), e);
+    }
+}
+
+#[inline]
+fn do_rename(args: &str) {
+        if args.is_empty() {
+            print_err!("rename", format!("args error: [{}]", args));
+            return;
+        }
+    
+        let (old_name, new_name) = split_whitespace(args);
+        if new_name.is_empty() {
+            print_err!("rename", format!("args error: [{}]", args));
+            return;
+        }
+    
+        if !fs::metadata(old_name).is_ok() {
+            print_err!("rename", format_args!("'{}' does not exist", old_name));
+            return;
+        }
+    
+        if let Err(e) = fs::rename(old_name, new_name) {
+            print_err!("rename", format_args!("failed to rename '{}' to '{}'", old_name, new_name), e);
+        }
+}
 
 fn file_type_to_char(ty: FileType) -> char {
     if ty.is_char_device() {
