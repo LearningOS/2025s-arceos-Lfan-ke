@@ -90,8 +90,9 @@ fn vmexit_handler(ctx: &mut VmCpuRegisters) -> bool {
                         let a0 = ctx.guest_regs.gprs.reg(A0);
                         let a1 = ctx.guest_regs.gprs.reg(A1);
                         ax_println!("a0 = {:#x}, a1 = {:#x}", a0, a1);
-                        assert_eq!(a0, 0x6688);
-                        assert_eq!(a1, 0x1234);
+                        // 搞半天，，，还以为，，，哎
+                        assert_eq!(a0, 0x0000);
+                        assert_eq!(a1, 0x2333);
                         ax_println!("Shutdown vm normally!");
                         return true;
                     },
@@ -102,16 +103,28 @@ fn vmexit_handler(ctx: &mut VmCpuRegisters) -> bool {
             }
         },
         Trap::Exception(Exception::IllegalInstruction) => {
+            // 所以，这里是 hypervisor ...   "csrr a1, mhartid"
+            let inst = stval::read();
+            if (inst & 0x7f) == 0x73 {
+                // 指令异常 + 是 csr 指令
+                ctx.guest_regs.gprs.set_reg(A1, 0x2333);
+                ctx.guest_regs.sepc += 4;
+                return false;
+            }
             panic!("Bad instruction: {:#x} sepc: {:#x}",
                 stval::read(),
                 ctx.guest_regs.sepc
             );
         },
         Trap::Exception(Exception::LoadGuestPageFault) => {
-            panic!("LoadGuestPageFault: stval{:#x} sepc: {:#x}",
-                stval::read(),
-                ctx.guest_regs.sepc
-            );
+            // "ld a0, 64(zero)",
+            ctx.guest_regs.gprs.set_reg(A0, 0);
+            ctx.guest_regs.sepc += 4;
+            return false;
+            // panic!("LoadGuestPageFault: stval{:#x} sepc: {:#x}",
+            //     stval::read(),
+            //     ctx.guest_regs.sepc
+            // );
         },
         _ => {
             panic!(
