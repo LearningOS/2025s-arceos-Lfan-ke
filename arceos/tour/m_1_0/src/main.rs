@@ -5,6 +5,8 @@
 extern crate axstd as std;
 extern crate alloc;
 
+static POPULATING: bool = false;  // 原来是：true;
+
 #[macro_use]
 extern crate axlog;
 
@@ -36,7 +38,7 @@ fn main() {
     }
 
     // Init user stack.
-    let ustack_top = init_user_stack(&mut uspace, true).unwrap();
+    let ustack_top = init_user_stack(&mut uspace, POPULATING).unwrap();
     ax_println!("New user address space: {:#x?}", uspace);
 
     // Let's kick off the user process.
@@ -64,4 +66,27 @@ fn init_user_stack(uspace: &mut AddrSpace, populating: bool) -> io::Result<VirtA
         populating,
     ).unwrap();
     Ok(ustack_top)
+}
+
+use axtask::TaskExtRef;
+use axhal::trap::{register_trap_handler, PAGE_FAULT};
+
+#[register_trap_handler(PAGE_FAULT)]
+#[inline]
+fn handle_page_fault(vaddr: VirtAddr, access_flags: MappingFlags, is_user: bool) -> bool {
+    if is_user {
+        if !axtask::current()
+        .task_ext()
+        .aspace
+        .lock()
+        .handle_page_fault(vaddr, access_flags) {
+            ax_println!("{}: segmentation fault, exit!", axtask::current().id_name());
+            axtask::exit(-1);
+        } else {
+            ax_println!("{}: handle page fault OK!", axtask::current().id_name());
+        }
+        true
+    } else {
+        false
+    }
 }
