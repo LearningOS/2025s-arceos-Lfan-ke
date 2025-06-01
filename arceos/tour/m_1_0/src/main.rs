@@ -72,21 +72,21 @@ use axtask::TaskExtRef;
 use axhal::trap::{register_trap_handler, PAGE_FAULT};
 
 #[register_trap_handler(PAGE_FAULT)]
-#[inline]
 fn handle_page_fault(vaddr: VirtAddr, access_flags: MappingFlags, is_user: bool) -> bool {
     if is_user {
-        if !axtask::current()
-        .task_ext()
-        .aspace
+        if !axtask::current()      // 获取当前进程
+        .task_ext()                // 获取进程的扩展信息
+        .aspace                    // 获取进程的地址空间
         .lock()
-        .handle_page_fault(vaddr, access_flags) {
+        .handle_page_fault(vaddr, access_flags) {  // 修复失败即退出
             ax_println!("{}: segmentation fault, exit!", axtask::current().id_name());
             axtask::exit(-1);
         } else {
+            // 修复成功
             ax_println!("{}: handle page fault OK!", axtask::current().id_name());
         }
         true
     } else {
-        false
+        false   // 内核态错误，触发 panic
     }
 }
