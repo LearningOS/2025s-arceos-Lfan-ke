@@ -9,7 +9,15 @@ pub fn load_user_app(fname: &str, uspace: &mut AddrSpace) -> io::Result<()> {
     let mut buf = [0u8; 64];
     load_file(fname, &mut buf)?;
 
-    uspace.map_alloc(APP_ENTRY.into(), PAGE_SIZE_4K, MappingFlags::READ|MappingFlags::WRITE|MappingFlags::EXECUTE|MappingFlags::USER, true).unwrap();
+    uspace.map_alloc(
+        APP_ENTRY.into(), 
+        PAGE_SIZE_4K, 
+        MappingFlags::READ |
+            MappingFlags::WRITE |
+            MappingFlags::EXECUTE |
+            MappingFlags::USER,
+        true
+    ).unwrap();
 
     let (paddr, _, _) = uspace
         .page_table()

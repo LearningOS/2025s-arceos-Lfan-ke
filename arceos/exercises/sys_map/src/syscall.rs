@@ -100,7 +100,7 @@ bitflags::bitflags! {
 fn handle_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
     ax_println!("handle_syscall [{}] ...", syscall_num);
     let ret = match syscall_num {
-         SYS_IOCTL => sys_ioctl(tf.arg0() as _, tf.arg1() as _, tf.arg2() as _) as _,
+        SYS_IOCTL => sys_ioctl(tf.arg0() as _, tf.arg1() as _, tf.arg2() as _) as _,
         SYS_SET_TID_ADDRESS => sys_set_tid_address(tf.arg0() as _),
         SYS_OPENAT => sys_openat(tf.arg0() as _, tf.arg1() as _, tf.arg2() as _, tf.arg3() as _),
         SYS_CLOSE => sys_close(tf.arg0() as _),
@@ -131,6 +131,14 @@ fn handle_syscall(tf: &TrapFrame, syscall_num: usize) -> isize {
     ret
 }
 
+use memory_addr::VirtAddrRange;
+use axhal::mem::{MemoryAddr, VirtAddr};
+
+/// 笔记：
+/// 分为匿名映射、文件映射、驱动映射等等，其中：
+/// - 匿名映射就是在用户空间开辟一个足够大的内存空间即可
+/// - 文件映射就是将虚拟地址关联到文件的页缓存，首访缺页
+/// - 驱动映射就是将显存等等映射到用户空间，此时是按需分配与映射
 #[allow(unused_variables)]
 fn sys_mmap(
     addr: *mut usize,
@@ -140,7 +148,39 @@ fn sys_mmap(
     fd: i32,
     _offset: isize,
 ) -> isize {
-    unimplemented!("no sys_mmap!");
+    let curr_task = current();
+    let mut uspace = curr_task.task_ext().aspace.lock();
+    let map_type = MmapFlags::from_bits_truncate(flags);
+    let vaddr = match uspace.find_free_area(
+        VirtAddr::from(addr as usize),
+        length.align_up_4k(),
+        VirtAddrRange::from_start_size(uspace.base(), uspace.size()),
+    ) {
+        Some(vaddr) => vaddr,
+        None => return -1,
+    };
+    match (map_type.contains(MmapFlags::MAP_ANONYMOUS), fd) {
+        (false, -1) => {
+            // 非法情况：未设置 MAP_ANONYMOUS 但 fd 无效
+            -1
+        }
+        (anonymous, fd) => {
+            uspace.map_alloc(
+                vaddr,
+                length.align_up_4k(),
+                MappingFlags::from_bits_truncate(prot as usize) | MappingFlags::WRITE | MappingFlags::USER,
+                true,
+            ).expect("map err");
+            if anonymous{
+                // 匿名映射（忽略 fd）
+                ;
+            } else {
+                // 文件映射（fd 有效）
+                api::sys_read(fd, vaddr.as_usize() as *mut _, length);
+            }
+            vaddr.as_usize() as isize
+        }
+    }
 }
 
 fn sys_openat(dfd: c_int, fname: *const c_char, flags: c_int, mode: api::ctypes::mode_t) -> isize {
