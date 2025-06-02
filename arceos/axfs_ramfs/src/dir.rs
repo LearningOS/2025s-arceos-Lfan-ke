@@ -1,15 +1,17 @@
 use alloc::collections::BTreeMap;
 use alloc::sync::{Arc, Weak};
 use alloc::{string::String, vec::Vec};
-
+use alloc::string::ToString;
+#[allow(unused_imports)]
 use axfs_vfs::{VfsDirEntry, VfsNodeAttr, VfsNodeOps, VfsNodeRef, VfsNodeType};
 use axfs_vfs::{VfsError, VfsResult};
+use log::debug;
 use spin::RwLock;
 
 use crate::file::FileNode;
 
 /// The directory node in the RAM filesystem.
-///
+/// 一个目录树啊
 /// It implements [`axfs_vfs::VfsNodeOps`].
 pub struct DirNode {
     this: Weak<DirNode>,
@@ -98,25 +100,6 @@ impl VfsNodeOps for DirNode {
         }
     }
 
-    fn read_dir(&self, start_idx: usize, dirents: &mut [VfsDirEntry]) -> VfsResult<usize> {
-        let children = self.children.read();
-        let mut children = children.iter().skip(start_idx.max(2) - 2);
-        for (i, ent) in dirents.iter_mut().enumerate() {
-            match i + start_idx {
-                0 => *ent = VfsDirEntry::new(".", VfsNodeType::Dir),
-                1 => *ent = VfsDirEntry::new("..", VfsNodeType::Dir),
-                _ => {
-                    if let Some((name, node)) = children.next() {
-                        *ent = VfsDirEntry::new(name, node.get_attr().unwrap().file_type());
-                    } else {
-                        return Ok(i);
-                    }
-                }
-            }
-        }
-        Ok(dirents.len())
-    }
-
     fn create(&self, path: &str, ty: VfsNodeType) -> VfsResult {
         log::debug!("create {:?} at ramfs: {}", ty, path);
         let (name, rest) = split_path(path);
@@ -159,18 +142,68 @@ impl VfsNodeOps for DirNode {
                 }
             }
         } else if name.is_empty() || name == "." || name == ".." {
-            Err(VfsError::InvalidInput) // remove '.' or '..
+            Err(VfsError::InvalidInput)
         } else {
             self.remove_node(name)
         }
     }
 
+    fn rename(&self, src: &str, dst: &str) -> VfsResult {
+        log::debug!("\n\nself: [{:?}]\n\n", self.children.read().keys().cloned().collect::<Vec<_>>());
+        let this = self.this.upgrade().unwrap();
+        let Ok(node) = this.clone().lookup(src) else {
+            return Err(VfsError::NotFound);
+        };
+        if let Ok(_) = this.clone().lookup(dst) {
+            return Err(VfsError::AlreadyExists);
+        }
+
+        let (_dst_dir, dst_name) = split_rpath(dst);
+        // match dst_dir {
+        //     None => {
+        //         let mut children = self.children.write();
+        //         children.insert(dst_name.to_string(), node);
+        //         children.remove(src);
+        //     }
+        //     Some(prefix) => {
+        //         let this = self.parent().expect("xx").as_any()
+        //             .downcast_ref::<DirNode>()
+        //             .unwrap().this.upgrade().unwrap();
+        //         let Ok(dir) = this.clone().lookup(prefix) else {
+        //             return Err(VfsError::NotFound);
+        //         };
+        //         let dir = dir.as_any().downcast_ref::<DirNode>().unwrap();
+        //         let mut children = dir.children.write();
+        //         children.insert(dst_name.to_string(), node);
+        //         let mut children = self.children.write();
+        //         children.remove(src);
+        //     }
+        // }
+        let mut children = self.children.write();
+        children.insert(dst_name.to_string(), node);
+        log::debug!("x..............................xx");
+        children.remove(src);
+        // log::debug!("\n\nself-after: [{:?}]\n\n", self.children.read().keys().cloned().collect::<Vec<_>>());
+        Ok(())
+    }
+
     axfs_vfs::impl_vfs_dir_default! {}
 }
 
+/// a/b/c  ->  a Some(b/c)
+/// 但是只做了一级
 fn split_path(path: &str) -> (&str, Option<&str>) {
     let trimmed_path = path.trim_start_matches('/');
     trimmed_path.find('/').map_or((trimmed_path, None), |n| {
+        log::debug!("lpp: [{:?}] - [{:?}]", &trimmed_path[..n], Some(&trimmed_path[n + 1..]));
         (&trimmed_path[..n], Some(&trimmed_path[n + 1..]))
+    })
+}
+
+fn split_rpath(path: &str) -> (Option<&str>, &str) {
+    let trimmed_path = path.trim_start_matches('/');
+    trimmed_path.rfind('/').map_or((None, trimmed_path), |n| {
+        log::debug!("rpp: [{:?}] - [{:#}]", Some(&trimmed_path[..n]), &trimmed_path[n + 1..]);
+        (Some(&trimmed_path[..n]), &trimmed_path[n + 1..])
     })
 }
