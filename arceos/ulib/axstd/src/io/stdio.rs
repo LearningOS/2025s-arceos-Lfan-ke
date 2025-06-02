@@ -166,12 +166,12 @@ pub fn __print_impl(args: core::fmt::Arguments) {
     if cfg!(feature = "smp") {
         // synchronize using the lock in axlog, to avoid interleaving
         // with kernel logs
-        // 使用hsv渐变
         arceos_api::stdio::ax_console_write_fmt(args).unwrap();
     } else {
         // heke - color1
         stdout().lock().write_fmt(format_args!(
-            "\x1b[1m\x1b[38;2;150;50;255m{}\x1b[0m\r\x1b[K",
+            // "\x1b[1m\x1b[38;2;150;50;255m{}\x1b[0m\r\x1b[K",
+            "{}",
             args
         )).unwrap();
     }
